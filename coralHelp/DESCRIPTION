@@ -1,0 +1,20 @@
+Package: coralHelp
+Title: Basic Functions To Help With Simple Datasets From Coral Restoration
+Version: 0.0.0.9000
+Authors@R: c(person("Kyleigh", "Kuball", role = c("aut", "cre"),
+                     email = "KyleighJ40@gmail.com"),
+              person("Aimee", "CookMcNab", role = "aut", email = "acookmc@hawaii.edu"),
+              person("Sophia", "Rahnke", role = "aut",
+                     email = "srahnke@hawaii.edu"))
+Description: This package contains functions that help with data wrangling, modeling, and visualization. This package was designed to simplify coral restoration and monitoring data and summarize it, run multiple t-tests, and to visualize the data using box and scatter plots. The goal of the creation of this package was to learn how to create a package consisting of functions and R skills that we learned in the University of Hawai'i at Mānoa MBIO 612 course.
+License: MIT + file LICENSE
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.1.2
+Depends: 
+    R (>= 2.10)
+LazyData: true
+Imports:
+    dplyr,
+    ggplot2,
+   
