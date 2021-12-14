@@ -1,0 +1,339 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+```{r}
+library(devtools)
+library(tidyverse)
+```
+
+```{r}
+coral_info <- as_tibble(coral_data)
+coral_info
+```
+
+
+```{r}
+# Data wrangling Function 1: to assign column names so function 2 understands
+fix_column_names <- function(userdata){
+    colnames(userdata) <- c("site", "species", "initial_health", "initial_size", "health_status", "growth", "temp", "depth", "outplant_date")
+    mydata <- userdata
+    mydata
+}
+
+test_data <- fix_column_names(initial_date_fix)
+test_data
+```
+
+```{r}
+# Data wrangling Function 2: to organize the data by grouping site and species as well as correcting date formats
+organize_data <- function(data, site, species, initial_health, initial_size, outplant_date, growth, temp, depth){
+    data %>%
+    select(site, species, initial_health, initial_size, health_status, outplant_date, growth, temp, depth) %>%
+    group_by(site, species) %>%D
+    mutate(outplant = as.POSIXct(outplant_date,tryFormats = c("%m/%d/%Y",
+                                            "%Y/%m/%d",
+                                            "%Y-%m-%d",
+                                            "%m-%d-%Y")), outplant_date = NULL)
+}
+```
+
+```{r}
+# Data wrangling Function 3: Gives basic summary statistics of a group within a specified data frame.
+get_basic_summary <- function(value = growth, group = site, data = coral_raw){
+  data_summary1 <- do.call(data.frame,
+                           aggregate(value ~ group,
+                                     data,
+                                     FUN = function(x) c(mean(x), sum(x), sd(x))))
+  colnames(data_summary1) <- c("group", "mean", "sum", "sd")
+  return(data_summary1)
+}
+```
+
+
+```{r}
+# Data wrangling Function 4: percentage of healthy, bleached, and dead coral per species per site
+site_info <- function(mydata, growth, species, depth, health_status, site){
+    site_agg <- aggregate(growth ~ species + depth + health_status + site, data = mydata, mean)
+    site_count <- site_agg %>%
+        group_by(site, species) %>%
+        count(health_status)
+    site_percentage <- site_count %>%
+        mutate(percentage = round(n/sum(n) * 100) )
+    site_percentage
+}
+```
+
+
+```{r}
+# Data Wrangling Function 5 - coral information, mean of initial_size, growth, and initial_health along with counts of number of species
+
+coral_info <- function(mydata, species, initial_size, growth, initial_health){
+  coral_group <- mydata %>%
+        group_by(species) %>%
+        summarise_at(vars("initial_size", "growth", "initial_health"), mean)
+  coral_group
+  
+  count_species <- mydata %>% 
+      count(species)
+      
+  coral_group %>%
+    add_column(n_species = count_species$n)
+}
+```
+
+```{r}
+#Modeling Function 1: Gives summary of p-values across three t-tests
+
+get_t_tests <- function(data, variable1, by1, variable2, by2, variable3, by3, ...) {
+  t1 <- t.test(data[[variable1]] ~ as.factor(data[[by1]]))$p.value
+  t2 <- t.test(data[[variable2]] ~ as.factor(data[[by2]]))$p.value
+  t3 <- t.test(data[[variable3]] ~ as.factor(data[[by3]]))$p.value
+  p_values <- c(t1, t2, t3)
+  t_test <- c("t_test1", "t_test2", "t_test3")
+  data_summary <- data.frame(t_test, p_values)
+  return(data_summary)
+}
+
+```
+
+```{r}
+# Modeling Function 2: Runs one-way, two-way and for interactions between varaibles with ANOVA test
+
+# Runs one-way,two-way, and for interactions between variables with ANOVA test
+#
+# This function simultaneously runs one-way and two-way ANOVA tests for three variables of your data set. It also runs a test for the interactions #' between variables to account for any interference from those variables.
+#
+# get_anova uses three different variables (var1, var2, var3) to produce summaries of one-way and two-way ANOVA tests for those variables.
+# It returns three sets of summarized information including sum of squares, degrees of freedom, residuals, and residuals standard error.
+#
+# @param var1 A variable (often denoted as a column in ecological data sets), may need to be a subset of the data; cannot contain NA's. 
+# @param var2 A variable (often denoted as a column in ecological data sets), may need to be a subset of the data; cannot contain NA's. 
+# @param var3 A variable (often denoted as a column in ecological data sets), may need to be a subset of the data; cannot contain NA's.
+# @return three list of summary information
+# @import ggplot2, ggpubr, tidyverse, broom, AICcmodavg
+#  @export
+#  @examples
+#  get_anova(data_set, data_set$variable_in_dataset, data_set$variable2_of_dataset, data_set$variable3_of_dataset)
+#' get_anova(raw_data, raw_data$temp, raw_data$health.status, raw_data$growth)
+get_anova <- function(data, var1, var2, var3){
+     one.way <- aov(var1 ~ var2, data = data)
+     two.way <- aov(var1 ~ var2 + var3, data = data)
+     interaction <- aov(var1 ~ var2 * var3, data = data)
+    
+     return(list(one.way, two.way, interaction))
+     
+     }
+```
+
+```{r}
+# Modeling Function 3: Linear Model creation
+
+get_lm = function(x, y, data){
+  as.data.frame(data)
+  a = data[[x]]
+  b = data[[y]]
+  lm <- lm(a~b)
+  summary(lm)
+}
+
+get_lm(x="growth", y="temp", data=coral_raw)
+```
+
+
+
+```{r}
+# Modeling Function and Visualization Function 4:
+
+predict_health = function(mydata, healthstat){
+   health_1 = function(x) {
+    if(x=="alive"){
+      1
+    }else{
+      0
+    }
+   }
+   binary_health = mapply(numeric_health, healthstat)
+   tibble_numeric = tibble(mydata, binary_health)
+   
+   numeric_lm <- lm(tibble_numeric$binary_health ~ tibble_numeric$initial.health + tibble_numeric$initial.size + tibble_numeric$growth)
+   summary(numeric_lm)
+   
+   ggplot() +
+  geom_point(aes(x = tibble_numeric$initial.health, y = tibble_numeric$binary_health)) +
+  geom_hline(yintercept = 0.5, linetype= "dashed", alpha=0.6, size = 1) +
+  geom_abline(color = "pink", size = 1) +
+  xlab("initial.health") +
+  ylab ("status") +
+  theme(text = element_text(size = 12))
+    
+      ggplot() +
+  geom_point(aes(x = tibble_numeric$initial.size, y = tibble_numeric$binary_health)) +
+  geom_hline(yintercept = 0.5, linetype= "dashed", alpha=0.6, size = 1) +
+  geom_abline(color = "pink", size = 1) +
+  xlab("initial.size") +
+  ylab ("status") +
+  theme(text = element_text(size = 12))
+      
+      ggplot() +
+  geom_point(aes(x = tibble_numeric$growth, y = tibble_numeric$binary_health)) +
+  geom_hline(yintercept = 0.5, linetype= "dashed", alpha=0.6, size = 1) +
+  geom_abline(color = "pink", size = 1) +
+  xlab("growth") +
+  ylab ("status") +
+  theme(text = element_text(size = 12))
+}
+
+predict_health(coral_info, coral_info$health.status)
+```
+
+
+```{r}
+# Visualization Function 1: Plot two boxplot and two scatter plot ggplot graphs
+#
+# this function plots two boxplots and two scatter plots using different x and y variables.
+#
+# xplore_graph uses three different (x,y,z) variables to plot the relationship between the environmental factors and focal species.
+# It returns four separate graphs in a 2 by 2 matrix that allows for side by side comparison.
+#
+# @param x A variable (often denoted as a column in ecological data sets), cannot contain NA's.
+# @param y A variable (often denoted as a column in ecological data sets), cannot contain NA's.
+# @param z A variable (often denoted as a column in ecological data sets), cannot contain NA's.
+# @return graphs of \code{x}, \code{y}, \code{z} in 2x2 plot matrix
+# @import dplyr, ggplot2, cowplot, tidyverse, tidyr
+# @export
+# @examples
+# xplore_graph(data_set, species(x), depth, health)
+# xplore_graph(data_set, site, coral_colony_size, disease_presence)
+xplore_graph <- function(df, x, y, z){
+  obj1 <- ggplot(df, aes(x = x, y = y)) +
+    geom_point()
+  obj2 <- ggplot(df, aes(x = x, y = z)) +
+    geom_point()
+  obj3 <- ggplot(df, aes(x = z, y = x)) +
+    geom_boxplot()
+  obj4 <- ggplot(df, aes(x = y, y = x)) +
+    geom_boxplot()
+return(plot_grid(obj1, obj2, obj3, obj4))
+}
+```
+
+```{r}
+# Visualization Function 2: plot four ggplot boxplot graphs
+#
+# this function plots four boxplots using four different x and y variables.
+#
+# get_boxplots uses three different (x1, y1, title1) arguments per plot, to plot the relationship between two defined variables and to create a custom title.
+# Dataframe being utilized must be specified as an argument. Titles have default values of 'Boxplot1 - Boxplot4".
+# It returns four boxplots graphs in a 2 by 2 matrix that allows for side by side comparison using cowplot plot_grid() function.
+#
+# @param data A dataframe, cannot contain NA's.
+# @param x1 A variable (often denoted as a column in ecological data sets), cannot contain NA's.
+# @param y1 A variable (often denoted as a column in ecological data sets), cannot contain NA's.
+# @param title1 Characters to describe plot 1.
+# @param x2 A variable (often denoted as a column in ecological data sets), cannot contain NA's.
+# @param y2 A variable (often denoted as a column in ecological data sets), cannot contain NA's.
+# @param title2 Characters to describe plot 2.
+# @param x3 A variable (often denoted as a column in ecological data sets), cannot contain NA's.
+# @param y3 A variable (often denoted as a column in ecological data sets), cannot contain NA's.
+# @param title3 Characters to describe plot 3.
+# @param x4 A variable (often denoted as a column in ecological data sets), cannot contain NA's.
+# @param y4 A variable (often denoted as a column in ecological data sets), cannot contain NA's.
+# @param title4 Characters to describe plot 4.
+# @return graphs of \code{x1, y1, title1}, \code{x2, y2, title2}, \code{x3, y3, title3}, \code{x4, y4, title4} in 2x2 plot matrix
+# @import dplyr, ggplot2, cowplot, tidyverse, tidyr
+# @export
+# @examples
+# get_boxplots(data = coral_raw, x1= species, y1= growth, x2 = species, y2 = initial_size, x3 = site, y3 = growth, x4 = site, y4 = temp, title4 = "Site vs Temp")
+#' get_boxplots(data = coral_raw, x1= site, y1= temp, x2 = species, y2 = initial_health, x3 = site, y3 = growth, x4 = health_status, y4 = initial_size)
+get_boxplots <- function(data, x1, y1, title1 = "Boxplot1", x2, y2, title2 = "Boxplot2",
+                         x3, y3, title3 = "Boxplot3", x4, y4, title4 = "Boxplot4"){
+  panel_a <- ggplot(data = data)+
+    geom_boxplot(aes(x = {{ x1 }}, y = {{ y1 }}, fill = {{ x1 }}))+
+    geom_point(aes(x = {{ x1 }}, y = {{ y1 }}))+
+    theme_classic(base_size = 8)+
+    ggtitle(title1)
+
+
+  panel_b <- ggplot(data = data)+
+    geom_boxplot(aes(x = {{ x2 }}, y = {{ y2 }}, fill = {{ x2 }}))+
+    geom_point(aes(x = {{ x2 }}, y = {{ y2 }}))+
+    theme_classic(base_size = 8)+
+    ggtitle(title2)
+
+  panel_c <- ggplot(data = data)+
+    geom_boxplot(aes(x = {{ x3 }}, y = {{ y3 }}, fill = {{ x3 }}))+
+    geom_point(aes(x = {{ x3 }}, y = {{ y3 }}))+
+    theme_classic(base_size = 8)+
+    ggtitle(title3)
+
+  panel_d <- ggplot(data = data)+
+    geom_boxplot(aes(x = {{ x4 }}, y = {{ y4 }}, fill = {{ x4 }}))+
+    geom_point(aes(x = {{ x4 }}, y = {{ y4 }}))+
+    theme_classic(base_size = 8)+
+    ggtitle(title4)
+
+  combine <- plot_grid(panel_a, panel_b, panel_c, panel_d)
+
+  return(combine)
+}
+```
+
+```{r}
+# Visualization Function 3: plot three ggplot scatter plot graphs
+#
+# this function plots three scatterplots using three different x and y variables.
+#
+# get_scatterplots uses two different (x1, y1) arguments per plot, to plot the relationship between two defined variables.
+# get_scatterplots also uses two other arguments (data, spp) to define the dataframe and to return results for a particular speices.
+# Dataframe, species, and x and y values for each plot must be specified as an argument.
+# It returns three scatterplot graphs that allows for side by side comparison using cowplot plot_grid() function.
+#
+# @param data A dataframe, cannot contain NA's.
+# @param x1 A variable (often denoted as a column in ecological data sets), cannot contain NA's.
+# @param y1 A variable (often denoted as a column in ecological data sets), cannot contain NA's.
+# @param x2 A variable (often denoted as a column in ecological data sets), cannot contain NA's.
+# @param y2 A variable (often denoted as a column in ecological data sets), cannot contain NA's.
+# @param x3 A variable (often denoted as a column in ecological data sets), cannot contain NA's.
+# @param y3 A variable (often denoted as a column in ecological data sets), cannot contain NA's.
+# @param spp A variable (often a factor within a column in ecological data sets), cannot contain NA's.
+# @return graphs of \code{x1, y1}, \code{x2, y2}, \code{x3, y3}
+# @import dplyr, ggplot2, cowplot, tidyverse, tidyr
+# @export
+# @examples
+# get_scatter_plots(data = coral_raw, x1 = growth, y1 = temp, x2 = depth, y2 = initial_size, x3 = initial_size, y3 = growth, spp="Porites lobata")
+# get_scatter_plots(data = coral_raw, x1 = depth, y1 = growth, x2 = temp, y2 = initial_size, x3 = initial_size, y3 = initial_health, spp="Pocillopora meandrina")
+
+
+
+get_scatter_plots <- function(data, x1, y1, x2, y2, x3, y3, spp){
+ panel_a <- ggplot(coral_raw%>%filter(species== spp))+
+    geom_smooth(aes( x = {{x1}}, y = {{y1}} ))+
+    geom_point(aes( x = {{x1}}, y = {{y1}}))+
+    theme_classic(base_size = 8)+
+    ggtitle("Scatter Plot 1")
+ 
+ panel_b <- ggplot(coral_raw%>%filter(species== spp))+
+   geom_smooth(aes( x = {{x2}}, y = {{y2}} ))+
+   geom_point(aes( x = {{x2}}, y = {{y2}}))+
+   theme_classic(base_size = 8)+
+   ggtitle("Scatter Plot 2")
+ 
+ panel_c <- ggplot(coral_raw%>%filter(species== spp))+
+   geom_smooth(aes( x = {{x3}}, y = {{y3}} ))+
+   geom_point(aes( x = {{x3}}, y = {{y3}}))+
+   theme_classic(base_size = 8)+
+   ggtitle("Scatter Plot 3")
+ 
+ combine <- plot_grid(panel_a, panel_b, panel_c, ncol=3)
+ 
+ return(combine)
+}
+```
+
+```{r}
+
+```
+
+
+
