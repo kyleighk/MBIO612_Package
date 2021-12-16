@@ -140,10 +140,33 @@ get_lm = function(x, y, data){
 get_lm(x="growth", y="temp", data=coral_raw)
 ```
 
+```{r}
+#Modeling Function 4: health stats lm model
+lm_health = function(mydata, healthstat){
+   health_1 = function(x) {
+    if(x=="alive"){
+      1
+    }else{
+      0
+    }
+   }
+   binary_health <- mapply(health_1, healthstat)
+   binary_health
+   tibble_numeric <- mydata %>% 
+      add_column(binary_health)
+   tibble_numeric
+   
+   numeric_lm <- lm(tibble_numeric$binary_health ~ tibble_numeric$initial.health + tibble_numeric$initial.size + tibble_numeric$growth)
+   summary(numeric_lm)
+}
+
+lm_health(coral_info, coral_info$health.status)
+```
+
 
 
 ```{r}
-# Modeling Function and Visualization Function 4:
+# Experimental function: ignore for project
 
 predict_health = function(mydata, healthstat){
    health_1 = function(x) {
@@ -332,7 +355,46 @@ get_scatter_plots <- function(data, x1, y1, x2, y2, x3, y3, spp){
 ```
 
 ```{r}
+ #Visualization Function 4: ggplot binary health statistic graphs
+predict_health = function(mydata, healthstat, healthvar_1, healthvar_2, healthvar_3){
+     health_1 = function(x) {
+    if(x=="alive"){
+      1
+    }else{
+      0
+    }
+   }
+   binary_health <- mapply(health_1, healthstat)
+   binary_health
+   tibble_numeric <- mydata %>% 
+      add_column(binary_health)
+   
+    ggplot() +
+  geom_point(aes(x = healthvar_1, y = tibble_numeric$binary_health)) +
+  geom_hline(yintercept = 0.5, linetype= "dashed", alpha=0.6, size = 1) +
+  geom_abline(color = "pink", size = 1) +
+  xlab("healthvar_1") +
+  ylab ("status") +
+  theme(text = element_text(size = 12))
+    
+      ggplot() +
+  geom_point(aes(x = healthvar_2, y = tibble_numeric$binary_health)) +
+  geom_hline(yintercept = 0.5, linetype= "dashed", alpha=0.6, size = 1) +
+  geom_abline(color = "pink", size = 1) +
+  xlab("healthvar_2") +
+  ylab ("status") +
+  theme(text = element_text(size = 12))
+      
+      ggplot() +
+  geom_point(aes(x = healthvar_3, y = tibble_numeric$binary_health)) +
+  geom_hline(yintercept = 0.5, linetype= "dashed", alpha=0.6, size = 1) +
+  geom_abline(color = "pink", size = 1) +
+  xlab("healthvar_3") +
+  ylab ("status") +
+  theme(text = element_text(size = 12))
+  }
 
+predict_health(coral_data, coral_data$health.status, coral_data$initial.size, coral_data$growth, coral_data$initial.health)
 ```
 
 
